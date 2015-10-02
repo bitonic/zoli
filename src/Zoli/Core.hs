@@ -53,6 +53,22 @@ instance Functor (RuleF tok) where
 
 -- Rule building
 
+-- TODO currently this single-token interface does not let us fire
+-- multiple rules at once.  This is bad -- if we can run things
+-- concurrently, we might not be able to exploit all our cores.
+--
+-- We have (at least) three options:
+--
+-- 1. Provide an applicative layer to be able to perform things in
+-- parallel.
+--
+-- 2. Cheat, and provide a more efficient 'Applicative' implementation,
+-- breaking the 'Monad' laws (a-la Haxl).
+--
+-- 3. Provide @ifChange :: (Monad m) -> [(tok a, a)] -> Rule tok m ()@.
+--
+-- Option 1. and 2. have the nice side effect of scaling to
+-- parallelizing any task.  3 is the simplest.
 ifChange
   :: (Monad m, Pattern tok) => tok a -> a -> Rule tok m ()
 ifChange tok pat =

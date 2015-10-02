@@ -9,7 +9,8 @@ module Zoli.Run.Dumb
   , runRules
   ) where
 
-import           Control.Monad (forM_, guard, unless)
+
+import           Control.Monad (forM, guard, unless)
 import           Control.Monad.Trans.Free (FreeF(..), FreeT(..))
 import           System.Directory (createDirectoryIfMissing, doesFileExist)
 import           System.FilePath (takeDirectory, (</>))
@@ -81,14 +82,18 @@ runRules (Config tmpDir liftM liftN) cmd rules = do
   let table = reverse table0
   case cmd of
     Build targets -> do
-      forM_ targets $ \target -> do
+      entries <- forM targets $ \target -> do
         let entries =
               [ Core.ifChange tok x
-              | SomeToken tok <- table, Just x <- [patMatch tok target] ]
+              | SomeToken tok <- table, Just x <- [patMatch tok target]
+              ]
         case entries of
           [] -> fail $ "No rules match target " ++ target ++ "!"
-          [entry] -> liftN $ goRule $ Core.unRule entry
+          [entry] -> return entry
           _:_ -> fail $ "Multiple rules match target " ++ target ++ "!"
+      -- TODO when we can, parallelize this (see TODO for
+      -- 'Core.ifChange').
+      liftN $ goRule $ Core.unRule $ sequence_ entries
     ShowRules ->
       mapM_ (\(SomeToken tok) -> putStrLn $ patDisplay tok) table
   where
