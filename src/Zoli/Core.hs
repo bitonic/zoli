@@ -26,9 +26,10 @@ module Zoli.Core
   , existing
   ) where
 
+import           Control.Applicative.Trans.Free (ApT)
 import           Control.Monad.IO.Class (MonadIO(..))
-import           Control.Monad.Trans.Free (FreeT, wrap)
 import           Control.Monad.Trans.Class (MonadTrans)
+import           Control.Monad.Trans.Free (FreeT, wrap)
 import qualified Data.ByteString as BS
 
 import           Zoli.Pattern
@@ -69,11 +70,15 @@ instance Functor (RuleF tok) where
 --
 -- Option 1. and 2. have the nice side effect of scaling to
 -- parallelizing any task.  3 is the simplest.
+
+-- | Run this rule when the provided 'Token' or any of its dependencies
+-- change.
 ifChange
   :: (Monad m, Pattern tok) => tok a -> a -> Rule tok m ()
 ifChange tok pat =
   Rule $ wrap $ IfChange tok pat $ return ()
 
+-- | Run this rule when the provided file changes.
 ifChangeFile :: (Monad m) => FilePath -> Rule tok m ()
 ifChangeFile fp = Rule $ wrap $ IfChangeFile fp $ return ()
 
