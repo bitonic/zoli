@@ -26,7 +26,6 @@ module Zoli.Core
   , existing
   ) where
 
-import           Control.Applicative.Trans.Free (ApT)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Trans.Class (MonadTrans)
 import           Control.Monad.Trans.Free (FreeT, wrap)

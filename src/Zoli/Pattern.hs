@@ -5,8 +5,6 @@ module Zoli.Pattern
   , Pat
   , pat1
   , pat2
-
-  , filePathPattern
   ) where
 
 import           Data.Typeable (Typeable)
@@ -54,7 +52,3 @@ pat2 = Pat2
 
 dropEnd :: Int -> String -> String
 dropEnd n = reverse . drop n . reverse
-
-filePathPattern
-  :: (Pattern f, Typeable (f a)) => String -> f a
-filePathPattern = error "TODO"
