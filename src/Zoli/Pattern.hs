@@ -2,7 +2,7 @@
 module Zoli.Pattern
   ( Pattern(..)
   , (@@)
-  , Pat
+  , SimplePat
   , pat1
   , pat2
   ) where
@@ -16,6 +16,7 @@ import           Control.Monad (guard)
 class Pattern f where
   patMatch :: f a -> String -> Maybe a
   patInstantiate :: f a -> a -> String
+
   -- | This function is just used for debugging and related tasks.  It
   -- should explain in 'String' form what the pattern does in a single
   -- line (e.g. in faux regex syntax).
@@ -24,31 +25,31 @@ class Pattern f where
 (@@) :: Pattern f => f a -> a -> String
 (@@) = patInstantiate
 
-data Pat a where
-  Pat1 :: String -> Pat ()
-  Pat2 :: String -> String -> Pat String
+data SimplePat a where
+  SimplePat1 :: String -> SimplePat ()
+  SimplePat2 :: String -> String -> SimplePat String
   deriving (Typeable)
 
-instance Pattern Pat where
+instance Pattern SimplePat where
   patMatch pat s = case pat of
-    Pat1 s' -> guard $ s == s'
-    Pat2 s1 s2 -> do
-      guard $ s1 `isPrefixOf` s
-      guard $ reverse s2 `isPrefixOf` reverse s
-      guard $ length s >= length s1 + length s2
-      return $ dropEnd (length s2) $ drop (length s1) $ s
+    SimplePat1 s' -> guard $ s == s'
+    SimplePat2 s1 s2 -> do
+      guard (s1 `isPrefixOf` s)
+      guard (reverse s2 `isPrefixOf` reverse s)
+      guard (length s >= length s1 + length s2)
+      return (dropEnd (length s2) (drop (length s1) s))
 
-  patInstantiate (Pat1 s) () = s
-  patInstantiate (Pat2 s1 s2) s = s1 ++ s ++ s2
+  patInstantiate (SimplePat1 s) () = s
+  patInstantiate (SimplePat2 s1 s2) s = s1 ++ s ++ s2
 
-  patDisplay (Pat1 s) = s
-  patDisplay (Pat2 s1 s2) = s1 ++ "*" ++ s2
+  patDisplay (SimplePat1 s) = s
+  patDisplay (SimplePat2 s1 s2) = s1 ++ "*" ++ s2
 
-pat1 :: String -> Pat ()
-pat1 = Pat1
+pat1 :: String -> SimplePat ()
+pat1 = SimplePat1
 
-pat2 :: String -> String -> Pat String
-pat2 = Pat2
+pat2 :: String -> String -> SimplePat String
+pat2 = SimplePat2
 
 dropEnd :: Int -> String -> String
 dropEnd n = reverse . drop n . reverse

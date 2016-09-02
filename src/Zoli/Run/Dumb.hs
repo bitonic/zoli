@@ -25,6 +25,11 @@ data Token m a where
   ExistingToken :: FilePath -> Token m ()
   PhonyToken :: String -> Rule m () -> Token m ()
 
+type RulesF m = Core.RulesF (Token m) m
+type Rule m = Core.Rule (Token m) m
+type RuleF m = Core.RuleF (Token m)
+type RuleHandler m a = Core.RuleHandler (Token m) m a
+
 instance Pattern (Token m) where
   patMatch tok fp = case tok of
     RuleToken pat _handler -> patMatch pat fp
@@ -42,17 +47,12 @@ instance Pattern (Token m) where
     ExistingToken fp -> fp
     PhonyToken str _ -> str
 
-type RulesF m = Core.RulesF (Token m) m
-type Rule m = Core.Rule (Token m) m
-type RuleF m = Core.RuleF (Token m)
-type RuleHandler m a = Core.RuleHandler (Token m) m a
-
 data SomeToken m = forall a. SomeToken (Token m a)
 
 data Config m n = Config
   { cfgTmpDir :: FilePath
-  , cfgLiftRules :: forall a. m a -> IO a
-  , cfgLiftRule :: forall a. n a -> IO a
+  , cfgRunRules :: forall a. m a -> IO a
+  , cfgRunRule :: forall a. n a -> IO a
   }
 
 data Cmd
@@ -84,15 +84,16 @@ runRules (Config tmpDir liftM liftN) cmd rules = do
     Build targets -> do
       entries <- forM targets $ \target -> do
         let entries =
-              [ Core.ifChange tok x
+              [ Core.need tok x
               | SomeToken tok <- table, Just x <- [patMatch tok target]
               ]
         case entries of
           [] -> fail $ "No rules match target " ++ target ++ "!"
           [entry] -> return entry
+          -- TODO display the conflicting rules
           _:_ -> fail $ "Multiple rules match target " ++ target ++ "!"
       -- TODO when we can, parallelize this (see TODO for
-      -- 'Core.ifChange').
+      -- 'Core.need').
       liftN $ goRule $ Core.unRule $ sequence_ entries
     ShowRules ->
       mapM_ (\(SomeToken tok) -> putStrLn $ patDisplay tok) table
@@ -120,9 +121,8 @@ runRules (Config tmpDir liftM liftN) cmd rules = do
         Pure x -> return x
         Free rule -> case rule of
           Core.Always cont -> goRule cont
-          Core.IfChangeFile _fp cont -> goRule cont
-          Core.Stamp _bs cont -> goRule cont
-          Core.IfChange tok x cont -> do
+          Core.NeedFile _fp cont -> goRule cont
+          Core.Need tok x cont -> do
             case tok of
               ExistingToken fp -> do
                 liftIO $ putStrLn $ "# Requesting " ++ fp

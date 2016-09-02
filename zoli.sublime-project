@@ -1,0 +1,14 @@
+{
+  "folders":
+  [
+    {
+      "path": ".",
+      "folder_exclude_patterns": [".stack-work" ],
+      "file_exclude_patterns": ["._*", "*.hi", "*.o", "#*#", ".#*", "*.dyn_hi", "*.dyn_o"],
+    },
+  ],
+  "settings": {
+    "tab_size": 2,
+    "detect_indentation": true
+  }
+}

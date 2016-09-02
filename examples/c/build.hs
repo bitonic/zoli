@@ -15,19 +15,17 @@ build :: Pattern tok => Rules tok IO Identity ()
 build = do
   objects <- rule (pat2 "objs/" ".o") $ \name out -> do
     let source = pat2 "src/" ".c" @@ name
-    ifChangeFile source
+    needFile source
     let deps = pat2 "deps/" ".d" @@ name
     liftIO $ createDirectoryIfMissing True $ takeDirectory deps
     () <- lift $ cmd "cc -MD -MF" [deps] "-c" "-o" [out] [source]
     depsFiles <- lift $ readFile deps
-    forM_ (words depsFiles) ifChangeFile
+    forM_ (words depsFiles) needFile
 
   void $ rule (pat1 "bin/myprog") $ \() out -> do
     let names = ["a", "b"]
-    mapM_ (ifChange objects) names
-    -- TODO use an @ifChange' :: tok a -> a -> Rule tok m String@ to get
-    -- paths directly
-    lift $ cmd "cc" "-o" [out] (map (objects @@) names)
+    objectsFiles <- mapM (need objects) names
+    lift $ cmd "cc" "-o" [out] objectsFiles
 
   void $ phony "clean" $ liftIO $ do
     removeDirectoryRecursive "objs"
@@ -38,8 +36,8 @@ main = do
   args <- getArgs
   let cfg = Config
         { cfgTmpDir = ".tmp"
-        , cfgLiftRules = return . runIdentity
-        , cfgLiftRule = id
+        , cfgRunRules = return . runIdentity
+        , cfgRunRule = id
         }
   let cmd' = if null args then ShowRules else Build args
   runRules cfg cmd' build

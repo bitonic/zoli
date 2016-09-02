@@ -9,9 +9,8 @@ module Zoli.Core
   , unRule
   , RuleF(..)
     -- ** Creating rules
-  , ifChange
-  , ifChangeFile
-  , stamp
+  , need
+  , needFile
   , always
     -- * Rules
   , Rules
@@ -29,7 +28,6 @@ module Zoli.Core
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Trans.Class (MonadTrans)
 import           Control.Monad.Trans.Free (FreeT, wrap)
-import qualified Data.ByteString as BS
 
 import           Zoli.Pattern
 
@@ -40,21 +38,19 @@ newtype Rule tok m a = Rule {unRule :: FreeT (RuleF tok) m a}
   deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
 data RuleF tok a
-  = forall p. IfChange (tok p) p a
-  | IfChangeFile FilePath a
-  | Stamp BS.ByteString a
+  = forall p. Need (tok p) p a
+  | NeedFile FilePath a
   | Always a
 
 instance Functor (RuleF tok) where
-  fmap f (IfChange tok p x) = IfChange tok p (f x)
-  fmap f (IfChangeFile p x) = IfChangeFile p (f x)
-  fmap f (Stamp bs x) = Stamp bs (f x)
+  fmap f (Need tok p x) = Need tok p (f x)
+  fmap f (NeedFile p x) = NeedFile p (f x)
   fmap f (Always x) = Always (f x)
 
 -- Rule building
 
 -- TODO currently this single-token interface does not let us fire
--- multiple rules at once.  This is bad -- if we can run things
+-- multiple rules at once.  This is bad -- interface we can run things
 -- concurrently, we might not be able to exploit all our cores.
 --
 -- We have (at least) three options:
@@ -65,29 +61,23 @@ instance Functor (RuleF tok) where
 -- 2. Cheat, and provide a more efficient 'Applicative' implementation,
 -- breaking the 'Monad' laws (a-la Haxl).
 --
--- 3. Provide @ifChange :: (Monad m) -> [(tok a, a)] -> Rule tok m ()@.
+-- 3. Provide @need :: (Monad m) -> [(tok a, a)] -> Rule tok m ()@.
 --
 -- Option 1. and 2. have the nice side effect of scaling to
 -- parallelizing any task.  3 is the simplest.
 
 -- | Run this rule when the provided 'Token' or any of its dependencies
 -- change.
-ifChange
-  :: (Monad m, Pattern tok) => tok a -> a -> Rule tok m ()
-ifChange tok pat =
-  Rule $ wrap $ IfChange tok pat $ return ()
+need :: (Monad m) => tok a -> a -> Rule tok m ()
+need tok pat = Rule (wrap (Need tok pat (return ())))
 
 -- | Run this rule when the provided file changes.
-ifChangeFile :: (Monad m) => FilePath -> Rule tok m ()
-ifChangeFile fp = Rule $ wrap $ IfChangeFile fp $ return ()
-
--- | Run this rule when the provided 'BS.ByteString' changes.
-stamp :: (Monad m) => BS.ByteString -> Rule tok m ()
-stamp st = Rule $ wrap $ Stamp st $ return ()
+needFile :: (Monad m) => FilePath -> Rule tok m ()
+needFile fp = Rule (wrap (NeedFile fp (return ())))
 
 -- | Always run this rule.
 always :: (Monad m) => Rule tok m ()
-always = Rule $ wrap $ Always $ return ()
+always = Rule (wrap (Always (return ())))
 
 -- Rules
 ------------------------------------------------------------------------
@@ -114,13 +104,13 @@ type OutPath = FilePath
 type RuleHandler tok r a = a -> OutPath -> Rule tok r ()
 
 -- | Add a given rule to the build process.
-rule
-  :: (Monad m, Pattern tok, Pattern f)
+rule ::
+     (Monad m, Pattern tok, Pattern f)
   => f a -> RuleHandler tok r a -> Rules tok r m (tok a)
-rule pat rh = Rules $ wrap $ AddRule pat rh return
+rule pat rh = Rules (wrap (AddRule pat rh return))
 
 phony :: (Monad m, Pattern tok) => String -> Rule tok r () -> Rules tok r m (tok ())
-phony s h = Rules $ wrap $ Phony s h return
+phony s h = Rules (wrap (Phony s h return))
 
 -- | Refer to an existing file.
 --
